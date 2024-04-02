@@ -1,0 +1,51 @@
+[build-system]
+requires = ["hatchling==1.27.0"]
+build-backend = "hatchling.build"
+
+[project]
+name = "hatchlot"
+version = "0.1.0"
+description = "Production accounting for a coldwater salmonid hatchery"
+readme = "README.md"
+requires-python = ">=3.12"
+authors = [{ name = "glinskevxer" }]
+dependencies = ["click==8.1.8"]
+
+[project.optional-dependencies]
+dev = [
+  "pytest==8.3.4",
+  "pytest-cov==6.0.0",
+  "coverage==7.6.12",
+  "ruff==0.9.6",
+  "mypy==1.15.0",
+]
+
+[project.scripts]
+hatchlot = "hatchlot.cli.main:main"
+
+[tool.hatch.build.targets.wheel]
+packages = ["src/hatchlot"]
+
+[tool.ruff]
+line-length = 100
+target-version = "py312"
+src = ["src", "tests"]
+
+[tool.ruff.lint]
+select = ["E", "F", "I", "UP", "B", "SIM", "C4", "RET", "ARG"]
+
+[tool.mypy]
+python_version = "3.12"
+files = ["src", "tests"]
+strict = true
+warn_unreachable = true
+disallow_any_generics = true
+
+[[tool.mypy.overrides]]
+module = "tests.*"
+disallow_untyped_defs = false
+disallow_incomplete_defs = false
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+addopts = "-ra"
