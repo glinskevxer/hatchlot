@@ -40,31 +40,37 @@ class System(Enum):
 class Unit:
     """One unit: what it measures, how it prints, and its size in base units.
 
-    Temperature is the exception and carries an offset as well as a factor,
-    which is why nothing here is a bare multiplication at the call site.
+    The size is a ratio rather than a single factor, because 5/9 and 1000/60 do
+    not have exact decimal forms and a repeating literal turns 50 degF into
+    10.00000000000000000008 degC. Temperature carries an offset as well, which
+    is why nothing here is a bare multiplication at the call site.
     """
 
     symbol: str
     dimension: Dimension
     factor: Decimal
+    divisor: Decimal = Decimal(1)
     offset: Decimal = Decimal(0)
     system: System | None = None
 
     def to_base(self, value: Number) -> Decimal:
-        return (to_decimal(value, field=self.symbol) + self.offset) * self.factor
+        amount = to_decimal(value, field=self.symbol) + self.offset
+        return amount * self.factor / self.divisor
 
     def from_base(self, value: Number) -> Decimal:
-        return to_decimal(value, field=self.symbol) / self.factor - self.offset
+        amount = to_decimal(value, field=self.symbol) * self.divisor / self.factor
+        return amount - self.offset
 
 
 def _u(
     symbol: str,
     dimension: Dimension,
     factor: str,
+    divisor: str = "1",
     offset: str = "0",
     system: System | None = None,
 ) -> Unit:
-    return Unit(symbol, dimension, Decimal(factor), Decimal(offset), system)
+    return Unit(symbol, dimension, Decimal(factor), Decimal(divisor), Decimal(offset), system)
 
 
 # Base units: metre, kilogram, litre, litre per minute, degree Celsius,
@@ -86,11 +92,11 @@ _UNITS: dict[str, Unit] = {
         _u("ft3", Dimension.VOLUME, "28.316846592", system=System.US),
         _u("gal", Dimension.VOLUME, "3.785411784", system=System.US),
         _u("Lpm", Dimension.FLOW, "1", system=System.METRIC),
-        _u("m3ph", Dimension.FLOW, "16.6666666666666667", system=System.METRIC),
+        _u("m3ph", Dimension.FLOW, "1000", "60", system=System.METRIC),
         _u("gpm", Dimension.FLOW, "3.785411784", system=System.US),
         _u("cfs", Dimension.FLOW, "1699.0107955", system=System.US),
         _u("C", Dimension.TEMPERATURE, "1", system=System.METRIC),
-        _u("F", Dimension.TEMPERATURE, "0.55555555555555555556", "-32", system=System.US),
+        _u("F", Dimension.TEMPERATURE, "5", "9", "-32", system=System.US),
         _u("mgL", Dimension.CONCENTRATION, "1"),
         _u("ugL", Dimension.CONCENTRATION, "0.001"),
         _u("ppm", Dimension.CONCENTRATION, "1"),

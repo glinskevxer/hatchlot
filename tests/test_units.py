@@ -88,3 +88,12 @@ def test_unit_objects_expose_their_system_so_a_report_can_group_them():
     assert unit("ft").system is System.US
     assert unit("mm").system is System.METRIC
     assert unit("mgL").system is None
+
+
+def test_fifty_fahrenheit_is_exactly_ten_celsius_with_no_repeating_tail():
+    assert convert(50, "F", "C") == Decimal("10")
+
+
+def test_a_cubic_metre_per_hour_is_exactly_one_sixtieth_of_a_thousand_litres():
+    assert convert(6, "m3ph", "Lpm") == Decimal("100")
+    assert convert(100, "Lpm", "m3ph") == Decimal("6")
