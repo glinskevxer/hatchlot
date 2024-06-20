@@ -16,6 +16,7 @@ from enum import Enum
 from ..errors import ValidationError
 from ..numeric import Number, require_non_negative, require_positive, to_decimal
 from ..quantities.base import Quantity
+from .blending import flow_weighted
 
 MMHG_PER_METRE_OF_WATER = Decimal("73.42")
 
@@ -106,16 +107,9 @@ def blended_delta_p(readings: list[tuple[GasReading, Quantity]]) -> Decimal:
     every station does on paper and it is right to within the reading error.
     """
 
-    if not readings:
-        raise ValidationError("cannot blend nothing", field="readings")
-    total = Decimal(0)
-    weighted = Decimal(0)
-    for reading, flow in readings:
-        share = flow.to("gpm").amount
-        if share < 0:
-            raise ValidationError("a negative flow is not a contribution", field="flow")
-        total += share
-        weighted += share * reading.delta_p
-    if total == 0:
-        raise ValidationError("a blend with no flow has no gas pressure", field="readings")
-    return weighted / total
+    return flow_weighted(
+        readings,
+        lambda pair: pair[1],
+        lambda pair: pair[0].delta_p,
+        what="gas blend",
+    )

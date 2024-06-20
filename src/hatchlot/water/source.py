@@ -17,6 +17,7 @@ from ..identifiers import normalise_code
 from ..numeric import require_non_negative, require_range
 from ..quantities.base import Quantity
 from ..quantities.temperature import Temperature
+from .blending import flow_share, total_flow
 
 
 class SourceKind(Enum):
@@ -159,19 +160,16 @@ class SourceRegister:
         return tuple(s for s in self.all() if s.kind is kind)
 
     def total_dependable_flow(self, symbol: str = "gpm") -> Quantity:
-        total = Quantity(0, symbol)
-        for source in self.all():
-            total = total + source.dependable_flow
-        return total
+        return total_flow(self.all(), lambda source: source.dependable_flow, symbol)
 
     def reuse_fraction(self) -> Decimal:
         """How much of the station's dependable water has been through fish already."""
 
-        total = self.total_dependable_flow().amount
-        if total == 0:
+        if self.total_dependable_flow().amount == 0:
             return Decimal(0)
-        reused = sum(
-            (s.dependable_flow.to("gpm").amount for s in self.of_kind(SourceKind.REUSE)),
-            Decimal(0),
+        share = flow_share(
+            self.all(),
+            lambda source: source.dependable_flow,
+            lambda source: source.kind is SourceKind.REUSE,
         )
-        return require_range(reused / total, 0, 1, field="reuse_fraction")
+        return require_range(share, 0, 1, field="reuse_fraction")
