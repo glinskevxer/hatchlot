@@ -12,11 +12,12 @@ from dataclasses import dataclass
 from decimal import Decimal
 from enum import Enum
 
-from ..errors import DuplicateError, NotFoundError, ValidationError
+from ..errors import ValidationError
 from ..identifiers import normalise_code
 from ..numeric import require_non_negative, require_range
 from ..quantities.base import Quantity
 from ..quantities.temperature import Temperature
+from ..registry import CodeRegistry
 from .blending import flow_share, total_flow
 
 
@@ -128,36 +129,14 @@ def mix_fraction(parts: list[BlendPart], source: str) -> Decimal:
     return share / total
 
 
-class SourceRegister:
+class SourceRegister(CodeRegistry[WaterSource]):
     """The station's water supplies, keyed by code."""
 
     def __init__(self) -> None:
-        self._sources: dict[str, WaterSource] = {}
-
-    def add(self, source: WaterSource) -> WaterSource:
-        if source.code in self._sources:
-            raise DuplicateError("water source", source.code)
-        self._sources[source.code] = source
-        return source
-
-    def get(self, code: str) -> WaterSource:
-        key = normalise_code(code, field="source")
-        try:
-            return self._sources[key]
-        except KeyError:
-            raise NotFoundError("water source", key) from None
-
-    def __len__(self) -> int:
-        return len(self._sources)
-
-    def __contains__(self, code: object) -> bool:
-        return isinstance(code, str) and normalise_code(code) in self._sources
-
-    def all(self) -> tuple[WaterSource, ...]:
-        return tuple(self._sources[code] for code in sorted(self._sources))
+        super().__init__("water source", lambda source: source.code)
 
     def of_kind(self, kind: SourceKind) -> tuple[WaterSource, ...]:
-        return tuple(s for s in self.all() if s.kind is kind)
+        return self.where(lambda source: source.kind is kind)
 
     def total_dependable_flow(self, symbol: str = "gpm") -> Quantity:
         return total_flow(self.all(), lambda source: source.dependable_flow, symbol)

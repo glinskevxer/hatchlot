@@ -15,10 +15,11 @@ from decimal import Decimal
 from enum import Enum
 
 from ..calendar import DateRange, parse_date
-from ..errors import DuplicateError, NotFoundError, StateError, ValidationError
+from ..errors import DuplicateError, StateError, ValidationError
 from ..identifiers import normalise_code, normalise_species
 from ..numeric import safe_divide
 from ..quantities.temperature import Temperature
+from ..registry import CodeRegistry
 from ..species import resolve_species
 from .eggcount import CountMethod, EggEstimate
 
@@ -130,36 +131,20 @@ class SpawnTake:
         return self.state in {TakeState.RELEASED, TakeState.DESTROYED}
 
 
-class TakeRegister:
-    """Every take of a season, keyed by code."""
+class TakeRegister(CodeRegistry[SpawnTake]):
+    """Every take of a season, keyed by code and listed in the order they happened."""
 
     def __init__(self) -> None:
-        self._takes: dict[str, SpawnTake] = {}
-
-    def add(self, take: SpawnTake) -> SpawnTake:
-        if take.code in self._takes:
-            raise DuplicateError("take", take.code)
-        self._takes[take.code] = take
-        return take
-
-    def get(self, code: str) -> SpawnTake:
-        key = normalise_code(code, field="take")
-        try:
-            return self._takes[key]
-        except KeyError:
-            raise NotFoundError("take", key) from None
-
-    def __len__(self) -> int:
-        return len(self._takes)
+        super().__init__("take", lambda take: take.code)
 
     def all(self) -> tuple[SpawnTake, ...]:
-        return tuple(sorted(self._takes.values(), key=lambda take: (take.day, take.code)))
+        return tuple(sorted(super().all(), key=lambda take: (take.day, take.code)))
 
     def within(self, window: DateRange) -> tuple[SpawnTake, ...]:
         return tuple(take for take in self.all() if take.day in window)
 
     def in_state(self, state: TakeState) -> tuple[SpawnTake, ...]:
-        return tuple(take for take in self.all() if take.state is state)
+        return self.where(lambda take: take.state is state)
 
     def for_species(self, species: str) -> tuple[SpawnTake, ...]:
         code = resolve_species(species).code
