@@ -20,7 +20,7 @@ from enum import Enum
 
 from ..calendar import DateRange, parse_date
 from ..errors import ValidationError
-from ..numeric import to_decimal
+from ..numeric import Number, to_decimal
 from ..quantities.temperature import Temperature
 
 
@@ -120,7 +120,7 @@ class ThermalSeries:
         self,
         window: DateRange,
         *,
-        zero_point_c: Decimal | int = 0,
+        zero_point_c: Number = 0,
         policy: GapPolicy = GapPolicy.REFUSE,
     ) -> Decimal:
         """Thermal units over a window, above a species zero point.
@@ -140,9 +140,9 @@ class ThermalSeries:
     def day_units_reach(
         self,
         start: object,
-        target_units: Decimal | int | str,
+        target_units: Number,
         *,
-        zero_point_c: Decimal | int = 0,
+        zero_point_c: Number = 0,
         policy: GapPolicy = GapPolicy.REFUSE,
         limit_days: int = 800,
     ) -> date | None:
@@ -155,6 +155,8 @@ class ThermalSeries:
         target = to_decimal(target_units, field="target_units")
         if target <= 0:
             raise ValidationError("a target of zero units is not a question", field="target_units")
+        if not self._days:
+            return None
         zero = to_decimal(zero_point_c, field="zero_point_c")
         day = parse_date(start)
         total = Decimal(0)
@@ -174,10 +176,10 @@ class ThermalSeries:
     def projected_day(
         self,
         start: object,
-        target_units: Decimal | int | str,
-        mean_celsius: Decimal | int | str,
+        target_units: Number,
+        mean_celsius: Number,
         *,
-        zero_point_c: Decimal | int = 0,
+        zero_point_c: Number = 0,
     ) -> date:
         """Where the target lands if the water holds at a stated mean.
 

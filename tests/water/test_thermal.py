@@ -124,6 +124,10 @@ def test_the_target_lands_on_the_day_the_count_is_first_met():
     assert built.day_units_reach("2024-09-01", "90") == date(2024, 9, 9)
 
 
+def test_an_empty_series_answers_nothing_rather_than_raising():
+    assert ThermalSeries().day_units_reach("2024-09-01", 100) is None
+
+
 def test_a_series_that_runs_out_answers_nothing_rather_than_guessing():
     built = steady("2024-09-01", 5, "10")
     assert built.day_units_reach("2024-09-01", 850) is None
