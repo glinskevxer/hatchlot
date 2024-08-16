@@ -18,6 +18,7 @@ from enum import Enum
 from ..calendar import DateRange, parse_timestamp
 from ..errors import ValidationError
 from ..identifiers import normalise_code
+from ..journal import Journal
 from ..numeric import Number, require_non_negative, to_decimal
 from ..quantities.temperature import Temperature
 
@@ -99,30 +100,33 @@ class MonitoringLog:
     """Every reading, kept in the order it was taken."""
 
     def __init__(self, readings: Iterable[Reading] = ()) -> None:
-        self._readings: list[Reading] = []
-        for reading in readings:
-            self.record(reading)
+        self._journal: Journal[Reading] = Journal(
+            day_of=lambda reading: reading.taken_at,
+            key_of=lambda reading: reading.container,
+        )
+        self._journal.extend(readings)
 
     def record(self, reading: Reading) -> Reading:
-        self._readings.append(reading)
-        self._readings.sort()
-        return reading
+        return self._journal.record(reading)
 
     def __len__(self) -> int:
-        return len(self._readings)
+        return len(self._journal)
 
     def __iter__(self) -> Iterator[Reading]:
         return iter(self._readings)
 
+    @property
+    def _readings(self) -> tuple[Reading, ...]:
+        return tuple(sorted(self._journal.all()))
+
     def containers(self) -> tuple[str, ...]:
-        return tuple(sorted({reading.container for reading in self._readings}))
+        return self._journal.keys()
 
     def for_container(self, container: str) -> tuple[Reading, ...]:
-        code = normalise_code(container, field="container")
-        return tuple(reading for reading in self._readings if reading.container == code)
+        return tuple(sorted(self._journal.for_key(container)))
 
     def within(self, window: DateRange) -> tuple[Reading, ...]:
-        return tuple(reading for reading in self._readings if reading.taken_at.date() in window)
+        return self._journal.within(window)
 
     def latest(self, container: str) -> Reading | None:
         readings = self.for_container(container)

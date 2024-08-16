@@ -21,6 +21,7 @@ from enum import Enum
 from ..calendar import DateRange, parse_date
 from ..errors import ValidationError
 from ..identifiers import normalise_code
+from ..journal import Journal
 from ..numeric import Number, require_positive, safe_divide, to_decimal
 from .eggslot import EggLot, EggStage, LossCause
 
@@ -85,24 +86,22 @@ class PickingLog:
     """Every pick, over every lot."""
 
     def __init__(self, picks: Iterable[Pick] = ()) -> None:
-        self._picks: list[Pick] = []
-        for pick in picks:
-            self.record(pick)
+        self._journal: Journal[Pick] = Journal(
+            day_of=lambda pick: pick.day, key_of=lambda pick: pick.lot
+        )
+        self._journal.extend(picks)
 
     def record(self, pick: Pick) -> Pick:
-        self._picks.append(pick)
-        self._picks.sort()
-        return pick
+        return self._journal.record(pick)
 
     def __len__(self) -> int:
-        return len(self._picks)
+        return len(self._journal)
 
     def for_lot(self, lot: str) -> tuple[Pick, ...]:
-        code = normalise_code(lot, field="lot")
-        return tuple(pick for pick in self._picks if pick.lot == code)
+        return self._journal.for_key(lot)
 
     def within(self, window: DateRange) -> tuple[Pick, ...]:
-        return tuple(pick for pick in self._picks if pick.day in window)
+        return self._journal.within(window)
 
     def total_for(self, lot: str) -> Decimal:
         return sum((pick.count for pick in self.for_lot(lot)), Decimal(0))
