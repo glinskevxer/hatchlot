@@ -2,8 +2,8 @@
 
 Monitoring readings, picks, treatments and feedings are all the same structure:
 entries that arrive out of order, are kept in date order, and get sliced by a
-key and by a window. The three copies had drifted — one sorted on insert, one
-sorted on read, and one only sorted when it remembered to.
+key and by a window. The three copies had drifted. One sorted on
+insert, one sorted on read, and one only sorted when it remembered to.
 """
 
 from __future__ import annotations
