@@ -21,7 +21,7 @@ from enum import Enum
 from ..calendar import DateRange, parse_date
 from ..errors import ValidationError
 from ..identifiers import normalise_code
-from ..journal import Journal
+from ..journal import JournalLog
 from ..numeric import Number, require_positive, safe_divide, to_decimal
 from .eggslot import EggLot, EggStage, LossCause
 
@@ -82,31 +82,21 @@ class PickLimits:
             raise ValidationError("a history needs at least two days", field="history_days")
 
 
-class PickingLog:
+class PickingLog(JournalLog[Pick]):
     """Every pick, over every lot."""
 
     def __init__(self, picks: Iterable[Pick] = ()) -> None:
-        self._journal: Journal[Pick] = Journal(
-            day_of=lambda pick: pick.day, key_of=lambda pick: pick.lot
-        )
-        self._journal.extend(picks)
-
-    def record(self, pick: Pick) -> Pick:
-        return self._journal.record(pick)
-
-    def __len__(self) -> int:
-        return len(self._journal)
+        super().__init__(lambda pick: pick.day, lambda pick: pick.lot, picks)
 
     def for_lot(self, lot: str) -> tuple[Pick, ...]:
-        return self._journal.for_key(lot)
-
-    def within(self, window: DateRange) -> tuple[Pick, ...]:
-        return self._journal.within(window)
+        return self._for_key(lot)
 
     def total_for(self, lot: str) -> Decimal:
         return sum((pick.count for pick in self.for_lot(lot)), Decimal(0))
 
-    def on_day(self, lot: str, day: object) -> Decimal:
+    def picked_on(self, lot: str, day: object) -> Decimal:
+        """What came off one lot on one day, over however many rounds."""
+
         when = parse_date(day)
         return sum((pick.count for pick in self.for_lot(lot) if pick.day == when), Decimal(0))
 
@@ -114,7 +104,7 @@ class PickingLog:
         """The share of a lot picked on one day."""
 
         held = require_positive(standing, field="standing")
-        return safe_divide(self.on_day(lot, day), held, field="standing")
+        return safe_divide(self.picked_on(lot, day), held, field="standing")
 
     def recent_mean(self, lot: str, day: object, days: int) -> Decimal:
         """The mean daily pick over the days before a day, not counting it."""
@@ -134,7 +124,7 @@ class PickingLog:
         """Read a day's picking against both thresholds."""
 
         rules = limits or PickLimits()
-        today = self.on_day(lot, day)
+        today = self.picked_on(lot, day)
         if today == 0:
             return PickAlert.NORMAL
         if self.daily_rate(lot, day, standing) > rules.daily_ceiling:

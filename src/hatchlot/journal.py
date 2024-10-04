@@ -85,3 +85,45 @@ class Journal(Generic[T]):
 
 def _as_date(value: date | datetime) -> date:
     return value.date() if isinstance(value, datetime) else value
+
+
+class JournalLog(Generic[T]):
+    """The wrapper four logs had each written around a journal.
+
+    Subclasses give the two getters and add whatever their own domain needs.
+    What they stop having to write is `record`, `__len__`, the key slice and the
+    window slice, which had already drifted into four spellings.
+    """
+
+    def __init__(
+        self,
+        day_of: Callable[[T], date | datetime],
+        key_of: Callable[[T], str],
+        entries: Iterable[T] = (),
+    ) -> None:
+        self._journal: Journal[T] = Journal(day_of=day_of, key_of=key_of)
+        self._journal.extend(entries)
+
+    def record(self, entry: T) -> T:
+        return self._journal.record(entry)
+
+    def __len__(self) -> int:
+        return len(self._journal)
+
+    def __iter__(self) -> Iterator[T]:
+        return iter(self._journal)
+
+    def all(self) -> tuple[T, ...]:
+        return self._journal.all()
+
+    def keys(self) -> tuple[str, ...]:
+        return self._journal.keys()
+
+    def _for_key(self, key: str) -> tuple[T, ...]:
+        return self._journal.for_key(key)
+
+    def within(self, window: DateRange) -> tuple[T, ...]:
+        return self._journal.within(window)
+
+    def on_day(self, day: object) -> tuple[T, ...]:
+        return self._journal.on_day(day)

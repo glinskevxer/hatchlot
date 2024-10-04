@@ -21,7 +21,7 @@ from enum import Enum
 from ..calendar import DateRange, parse_date
 from ..errors import ValidationError
 from ..identifiers import normalise_code
-from ..journal import Journal
+from ..journal import JournalLog
 from ..numeric import Number, require_non_negative, require_positive, to_decimal
 from ..quantities.base import Quantity
 from .container import Container, ContainerKind
@@ -107,26 +107,14 @@ def cleaning_interval(container: Container, biomass: Quantity, *, base_days: int
     return max(whole, 1)
 
 
-class CleaningLog:
+class CleaningLog(JournalLog[Cleaning]):
     """Every cleaning on the station."""
 
     def __init__(self, cleanings: Iterable[Cleaning] = ()) -> None:
-        self._journal: Journal[Cleaning] = Journal(
-            day_of=lambda entry: entry.day, key_of=lambda entry: entry.container
-        )
-        self._journal.extend(cleanings)
-
-    def record(self, entry: Cleaning) -> Cleaning:
-        return self._journal.record(entry)
-
-    def __len__(self) -> int:
-        return len(self._journal)
+        super().__init__(lambda entry: entry.day, lambda entry: entry.container, cleanings)
 
     def for_container(self, container: str) -> tuple[Cleaning, ...]:
-        return self._journal.for_key(container)
-
-    def within(self, window: DateRange) -> tuple[Cleaning, ...]:
-        return self._journal.within(window)
+        return self._for_key(container)
 
     def last_cleaned(self, container: str) -> date | None:
         entries = self.for_container(container)
@@ -135,7 +123,7 @@ class CleaningLog:
     def solids_removed(self, window: DateRange | None = None) -> Quantity:
         """Everything actually taken out, which a flush does not count toward."""
 
-        entries = self.within(window) if window is not None else self._journal.all()
+        entries = self.within(window) if window is not None else self.all()
         total = Quantity(0, "kg")
         for entry in entries:
             if entry.solids is not None and entry.method.removes_solids:

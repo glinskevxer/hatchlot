@@ -20,7 +20,7 @@ from enum import Enum
 from ..calendar import DateRange, parse_date
 from ..errors import ValidationError
 from ..identifiers import normalise_code
-from ..journal import Journal
+from ..journal import JournalLog
 from ..numeric import Number, require_positive, safe_divide
 
 
@@ -76,26 +76,14 @@ class MortalityRecord:
         object.__setattr__(self, "recorded_by", recorded_by.strip())
 
 
-class MortalityLog:
+class MortalityLog(JournalLog[MortalityRecord]):
     """Every mortality record on the station."""
 
     def __init__(self, records: Iterable[MortalityRecord] = ()) -> None:
-        self._journal: Journal[MortalityRecord] = Journal(
-            day_of=lambda record: record.day, key_of=lambda record: record.lot
-        )
-        self._journal.extend(records)
-
-    def record(self, entry: MortalityRecord) -> MortalityRecord:
-        return self._journal.record(entry)
-
-    def __len__(self) -> int:
-        return len(self._journal)
+        super().__init__(lambda record: record.day, lambda record: record.lot, records)
 
     def for_lot(self, lot: str) -> tuple[MortalityRecord, ...]:
-        return self._journal.for_key(lot)
-
-    def within(self, window: DateRange) -> tuple[MortalityRecord, ...]:
-        return self._journal.within(window)
+        return self._for_key(lot)
 
     def total(self, lot: str, window: DateRange | None = None) -> Decimal:
         records = self.for_lot(lot)

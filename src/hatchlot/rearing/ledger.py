@@ -15,10 +15,10 @@ from datetime import date
 from decimal import Decimal
 from enum import Enum
 
-from ..calendar import DateRange, parse_date
+from ..calendar import parse_date
 from ..errors import ValidationError
 from ..identifiers import normalise_code
-from ..journal import Journal
+from ..journal import JournalLog
 from ..numeric import Number, require_positive, safe_divide
 
 
@@ -114,31 +114,20 @@ class LedgerBalance:
         return safe_divide(self.removed, base, field="opened")
 
 
-class Ledger:
+class Ledger(JournalLog[LedgerEntry]):
     """Every entry, over every lot."""
 
     def __init__(self) -> None:
-        self._journal: Journal[LedgerEntry] = Journal(
-            day_of=lambda entry: entry.day, key_of=lambda entry: entry.lot
-        )
-
-    def record(self, entry: LedgerEntry) -> LedgerEntry:
-        return self._journal.record(entry)
-
-    def __len__(self) -> int:
-        return len(self._journal)
+        super().__init__(lambda entry: entry.day, lambda entry: entry.lot)
 
     def lots(self) -> tuple[str, ...]:
-        return self._journal.keys()
+        return self.keys()
 
     def for_lot(self, lot: str) -> tuple[LedgerEntry, ...]:
-        return self._journal.for_key(lot)
-
-    def within(self, window: DateRange) -> tuple[LedgerEntry, ...]:
-        return self._journal.within(window)
+        return self._for_key(lot)
 
     def of_kind(self, kind: EntryKind) -> tuple[LedgerEntry, ...]:
-        return tuple(entry for entry in self._journal.all() if entry.kind is kind)
+        return tuple(entry for entry in self.all() if entry.kind is kind)
 
     def balance(self, lot: str, *, as_of: object | None = None) -> LedgerBalance:
         """Rebuild a lot's population from the entries, up to a day."""

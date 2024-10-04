@@ -66,8 +66,8 @@ def test_the_log_slices_by_window():
 
 def test_two_picks_on_one_day_add_up():
     log = PickingLog([pick("2024-09-20", 100), pick("2024-09-20", 40)])
-    assert log.on_day(LOT, "2024-09-20") == Decimal(140)
-    assert log.on_day(LOT, "2024-09-21") == Decimal(0)
+    assert log.picked_on(LOT, "2024-09-20") == Decimal(140)
+    assert log.picked_on(LOT, "2024-09-21") == Decimal(0)
 
 
 def test_the_daily_rate_is_against_what_is_standing():
