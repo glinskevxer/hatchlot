@@ -19,7 +19,13 @@ from enum import Enum
 from ..calendar import parse_date
 from ..errors import StateError, ValidationError
 from ..identifiers import LotCode, normalise_code
-from ..numeric import Number, require_positive, safe_divide, to_decimal
+from ..numeric import (
+    Number,
+    require_non_negative,
+    require_positive,
+    safe_divide,
+    to_decimal,
+)
 from ..quantities.base import Quantity
 from ..species import Species, species
 
@@ -62,7 +68,12 @@ class RearingLot:
             raise ValidationError("a rearing lot needs a lot code", field="code")
         self.container = normalise_code(self.container, field="container")
         self.ponded_on = parse_date(self.ponded_on)
-        self.population = require_positive(self.population, field="population")
+        # A live lot has fish in it. A closed one has none, by definition, and it
+        # still has to be loadable out of the database afterwards.
+        if self.state.is_closed:
+            self.population = require_non_negative(self.population, field="population")
+        else:
+            self.population = require_positive(self.population, field="population")
         require_positive(self.mean_weight.to("g").amount, field="mean_weight")
         if self.origin_egg_lot:
             self.origin_egg_lot = normalise_code(self.origin_egg_lot, field="origin_egg_lot")

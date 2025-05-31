@@ -186,3 +186,23 @@ def test_averaging_with_no_live_lots_is_refused():
         weighted_mean_weight([closed])
     with pytest.raises(ValidationError):
         weighted_mean_weight([])
+
+
+def test_a_closed_lot_can_be_rebuilt_with_no_fish_in_it():
+    rebuilt = RearingLot(
+        code=LotCode(2024, "CHK", 9),
+        container="RW-1",
+        ponded_on=date(2025, 1, 15),
+        population=Decimal(0),
+        mean_weight=Quantity(2, "g"),
+        state=LotState.RELEASED,
+    )
+    assert rebuilt.population == Decimal(0)
+    with pytest.raises(ValidationError):
+        RearingLot(
+            code=LotCode(2024, "CHK", 9),
+            container="RW-1",
+            ponded_on=date(2025, 1, 15),
+            population=Decimal(0),
+            mean_weight=Quantity(2, "g"),
+        )
