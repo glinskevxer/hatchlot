@@ -61,6 +61,7 @@ def run_import(
     keys: tuple[str, ...],
     *,
     reject_ceiling: Number = "0.2",
+    minimum_rows: int = 5,
 ) -> ImportReport:
     """Read a file, drop what is already held, and record what is left.
 
@@ -72,6 +73,8 @@ def run_import(
     ceiling = to_decimal(reject_ceiling, field="reject_ceiling")
     if not 0 <= ceiling <= 1:
         raise ValidationError("a rejection ceiling is a share", field="reject_ceiling")
+    if minimum_rows < 1:
+        raise ValidationError("a file has rows in it", field="minimum_rows")
     digest = file_hash(text)
     if digest in ledger.files:
         return ImportReport(
@@ -84,7 +87,10 @@ def run_import(
         )
     result = read_rows(profile, text)
     total = result.read + len(result.rejected)
-    if total and Decimal(len(result.rejected)) / Decimal(total) > ceiling:
+    # The ceiling is a share, and a share of three rows says nothing. Below the
+    # floor a bad row is just a bad row and the good ones still go in.
+    judged = total >= minimum_rows
+    if judged and Decimal(len(result.rejected)) / Decimal(total) > ceiling:
         raise ValidationError(
             f"{len(result.rejected)} of {total} rows would not read", field="text"
         )

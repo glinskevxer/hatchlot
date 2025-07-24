@@ -3,6 +3,7 @@
 from . import (  # noqa: F401  (registering the command groups)
     calc,
     feeding,
+    importing,
     lots,
     report,
     station,

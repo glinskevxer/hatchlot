@@ -81,6 +81,21 @@ def test_the_rejection_ceiling_can_be_moved():
     assert report.imported == 1
 
 
+def test_a_file_too_small_to_judge_is_not_judged():
+    text = "DateTime,Temp_F\n2025-03-01 06:00,50\n2025-03-02 06:00,bad\n"
+    report = run_import(profile(), text, ImportLedger(), KEYS)
+    assert report.imported == 1
+    assert report.rejected == 1
+
+
+def test_the_floor_below_which_a_file_is_not_judged_can_be_moved():
+    text = "DateTime,Temp_F\n2025-03-01 06:00,50\n2025-03-02 06:00,bad\n"
+    with pytest.raises(ValidationError):
+        run_import(profile(), text, ImportLedger(), KEYS, minimum_rows=2)
+    with pytest.raises(ValidationError):
+        run_import(profile(), text, ImportLedger(), KEYS, minimum_rows=0)
+
+
 def test_an_impossible_ceiling_is_refused():
     with pytest.raises(ValidationError):
         run_import(profile(), GOOD, ImportLedger(), KEYS, reject_ceiling="1.5")
