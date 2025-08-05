@@ -18,7 +18,8 @@ from ..store.db import execute, query
 from ..store.session import open_session
 from ..water.monitoring import MonitoringLog, Reading, Thresholds
 from .main import Context, guard, main, pass_context
-from .output import FORMAT_CHOICE, Format, count_line, echo, echo_pairs, parse_format
+from .options import format_option, window_from, window_options
+from .output import count_line, echo, echo_pairs, parse_format
 
 
 def _log_from(rows: list[dict[str, object]]) -> MonitoringLog:
@@ -92,15 +93,14 @@ def record(
 
 @water.command("list")
 @click.option("--unit", default="", help="Only this unit.")
-@click.option("--from", "start", default="", help="First day.")
-@click.option("--to", "end", default="", help="Last day.")
-@click.option("--format", "form", type=FORMAT_CHOICE, default=Format.TABLE.value)
+@window_options()
+@format_option
 @pass_context
 def list_readings(context: Context, unit: str, start: str, end: str, form: str) -> None:
     """List the readings, newest last."""
 
     def run() -> None:
-        window = DateRange(start, end) if start and end else None
+        window = window_from(start, end)
         log = _log_from(_rows(context, window))
         found = log.for_container(unit) if unit else tuple(log)
         echo(
@@ -126,7 +126,7 @@ def list_readings(context: Context, unit: str, start: str, end: str, form: str) 
 @click.option("--minimum-oxygen", default="6.0", show_default=True)
 @click.option("--maximum-temperature", default="16.0", show_default=True)
 @click.option("--minimum-temperature", default="2.0", show_default=True)
-@click.option("--format", "form", type=FORMAT_CHOICE, default=Format.TABLE.value)
+@format_option
 @pass_context
 def excursions(
     context: Context,
@@ -168,7 +168,7 @@ def excursions(
 
 @water.command("latest")
 @click.argument("unit")
-@click.option("--format", "form", type=FORMAT_CHOICE, default=Format.TABLE.value)
+@format_option
 @pass_context
 def latest(context: Context, unit: str, form: str) -> None:
     """Print the last reading on a unit and the mean behind it."""

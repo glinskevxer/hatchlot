@@ -25,7 +25,8 @@ from ..health.treatment import (
 from ..quantities.base import Quantity
 from ..quantities.temperature import Temperature
 from .main import Context, guard, main, pass_context
-from .output import FORMAT_CHOICE, Format, echo, echo_pairs, parse_format
+from .options import format_option
+from .output import echo, echo_pairs, parse_format
 
 
 @main.group()
@@ -52,7 +53,7 @@ def health() -> None:
 @click.option("--volume", default="", help="Volume in cubic metres, for a static bath.")
 @click.option("--inflow", default="", help="Inflow oxygen in mg/L, to check the headroom.")
 @click.option("--floor", default="6.0", show_default=True, help="Oxygen floor in mg/L.")
-@click.option("--format", "form", type=FORMAT_CHOICE, default=Format.TABLE.value)
+@format_option
 @pass_context
 def treatment(
     context: Context,
@@ -101,7 +102,7 @@ def treatment(
 
 @health.command("ceiling")
 @click.option("--water", required=True, help="Water temperature in C.")
-@click.option("--format", "form", type=FORMAT_CHOICE, default=Format.TABLE.value)
+@format_option
 @pass_context
 def ceiling(context: Context, water: str, form: str) -> None:
     """List what every chemical may be run at on this water."""
@@ -133,7 +134,7 @@ def ceiling(context: Context, water: str, form: str) -> None:
 @click.option("--start", required=True, help="The first day of the course.")
 @click.option("--biomass", required=True, help="Biomass in kilograms.")
 @click.option("--feeding-rate", "rate", required=True, help="Percent of body weight a day.")
-@click.option("--format", "form", type=FORMAT_CHOICE, default=Format.TABLE.value)
+@format_option
 @pass_context
 def prescription(
     context: Context,

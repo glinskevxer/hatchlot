@@ -21,7 +21,8 @@ from ..rearing.lot import RearingLot
 from ..store.lots import load_lot, save_entry, save_lot
 from ..store.session import open_session
 from .main import Context, guard, main, pass_context
-from .output import FORMAT_CHOICE, Format, count_line, echo, echo_pairs, parse_format
+from .options import format_option
+from .output import count_line, echo, echo_pairs, parse_format
 
 
 @main.group()
@@ -75,7 +76,7 @@ def pond(
 
 
 @lot.command("list")
-@click.option("--format", "form", type=FORMAT_CHOICE, default=Format.TABLE.value)
+@format_option
 @click.option("--all", "include_closed", is_flag=True, help="Include the closed lots.")
 @pass_context
 def list_lots(context: Context, form: str, include_closed: bool) -> None:
@@ -107,7 +108,7 @@ def list_lots(context: Context, form: str, include_closed: bool) -> None:
 
 @lot.command("show")
 @click.argument("code")
-@click.option("--format", "form", type=FORMAT_CHOICE, default=Format.TABLE.value)
+@format_option
 @pass_context
 def show(context: Context, code: str, form: str) -> None:
     """Print one lot, and how far it is off its own ledger."""
@@ -210,7 +211,7 @@ def move(context: Context, code: str, destination: str) -> None:
 
 
 @lot.command("reconcile")
-@click.option("--format", "form", type=FORMAT_CHOICE, default=Format.TABLE.value)
+@format_option
 @pass_context
 def reconcile(context: Context, form: str) -> None:
     """Show every lot whose record and ledger disagree."""

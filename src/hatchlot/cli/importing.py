@@ -22,7 +22,8 @@ from ..quantities.base import Quantity
 from ..store.db import execute, query
 from ..store.session import Session, open_session
 from .main import Context, guard, main, pass_context
-from .output import FORMAT_CHOICE, Format, count_line, echo, parse_format
+from .options import format_option
+from .output import count_line, echo, parse_format
 
 LOGGER_PROFILE = Profile(
     code="DATALOGGER",
@@ -124,7 +125,7 @@ def readings(context: Context, path: str, columns: str, dry_run: bool) -> None:
 @importing.command("check")
 @click.argument("path", type=click.Path(exists=True, dir_okay=False))
 @click.option("--columns", default="", help="A column=name list, if not the logger export.")
-@click.option("--format", "form", type=FORMAT_CHOICE, default=Format.TABLE.value)
+@format_option
 @pass_context
 def check(context: Context, path: str, columns: str, form: str) -> None:
     """Read a file and report what would happen, without writing anything."""
@@ -145,7 +146,7 @@ def check(context: Context, path: str, columns: str, form: str) -> None:
 
 
 @importing.command("profile")
-@click.option("--format", "form", type=FORMAT_CHOICE, default=Format.TABLE.value)
+@format_option
 @pass_context
 def profile_command(context: Context, form: str) -> None:
     """Print the built in profile, so a vendor file can be matched against it."""

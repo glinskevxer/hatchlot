@@ -21,7 +21,8 @@ from ..store.session import open_session
 from ..units import System
 from ..water.source import SourceKind, WaterSource
 from .main import Context, guard, main, pass_context
-from .output import FORMAT_CHOICE, Format, count_line, echo, echo_pairs, parse_format
+from .options import format_option
+from .output import count_line, echo, echo_pairs, parse_format
 
 
 @main.group()
@@ -63,7 +64,7 @@ def init(
 
 
 @station.command("show")
-@click.option("--format", "form", type=FORMAT_CHOICE, default=Format.TABLE.value)
+@format_option
 @pass_context
 def show(context: Context, form: str) -> None:
     """Print the station profile."""
@@ -161,7 +162,7 @@ def add_unit(
 
 
 @station.command("units")
-@click.option("--format", "form", type=FORMAT_CHOICE, default=Format.TABLE.value)
+@format_option
 @click.option("--available", is_flag=True, help="Leave out the units that are off.")
 @pass_context
 def units(context: Context, form: str, available: bool) -> None:
@@ -193,7 +194,7 @@ def units(context: Context, form: str, available: bool) -> None:
 
 
 @station.command("water")
-@click.option("--format", "form", type=FORMAT_CHOICE, default=Format.TABLE.value)
+@format_option
 @pass_context
 def water(context: Context, form: str) -> None:
     """List the water sources and what they are good for."""

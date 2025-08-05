@@ -21,7 +21,8 @@ from ..species import resolve_species
 from ..water.capacity import carrying_capacity
 from ..water.oxygen import percent_saturation, saturation_concentration
 from .main import Context, guard, main, pass_context
-from .output import FORMAT_CHOICE, Format, echo_pairs, parse_format
+from .options import format_option
+from .output import echo_pairs, parse_format
 
 
 @main.group()
@@ -37,7 +38,7 @@ def calc() -> None:
 @click.option("--water", default="10", show_default=True, help="Water temperature in C.")
 @click.option("--inflow", default="10.0", show_default=True, help="Inflow oxygen mg/L.")
 @click.option("--floor", default="6.0", show_default=True, help="Oxygen floor mg/L.")
-@click.option("--format", "form", type=FORMAT_CHOICE, default=Format.TABLE.value)
+@format_option
 @pass_context
 def loading(
     context: Context,
@@ -91,7 +92,7 @@ def loading(
 @click.option("--biomass", required=True, help="Biomass in kilograms.")
 @click.option("--weight", required=True, help="Mean fish weight in grams.")
 @click.option("--water", required=True, help="Water temperature in C.")
-@click.option("--format", "form", type=FORMAT_CHOICE, default=Format.TABLE.value)
+@format_option
 @pass_context
 def ration(context: Context, biomass: str, weight: str, water: str, form: str) -> None:
     """Say what a lot is owed for the day, and over how many feedings."""
@@ -125,7 +126,7 @@ def ration(context: Context, biomass: str, weight: str, water: str, form: str) -
 @click.option("--water", required=True, help="Water temperature in C.")
 @click.option("--elevation", default="0", show_default=True, help="Metres above sea level.")
 @click.option("--measured", default="", help="A meter reading in mg/L.")
-@click.option("--format", "form", type=FORMAT_CHOICE, default=Format.TABLE.value)
+@format_option
 @pass_context
 def oxygen(context: Context, water: str, elevation: str, measured: str, form: str) -> None:
     """Say what the water holds at saturation, and where a reading sits."""
@@ -150,7 +151,7 @@ def oxygen(context: Context, water: str, elevation: str, measured: str, form: st
 @calc.command("degree-days")
 @click.option("--species", required=True, help="Species code or name.")
 @click.option("--water", required=True, help="Mean water temperature in C.")
-@click.option("--format", "form", type=FORMAT_CHOICE, default=Format.TABLE.value)
+@format_option
 @pass_context
 def degree_days(context: Context, species: str, water: str, form: str) -> None:
     """Say how long incubation takes on a steady water."""
@@ -174,7 +175,7 @@ def degree_days(context: Context, species: str, water: str, form: str) -> None:
 
 @calc.command("species")
 @click.argument("name")
-@click.option("--format", "form", type=FORMAT_CHOICE, default=Format.TABLE.value)
+@format_option
 @pass_context
 def species_command(context: Context, name: str, form: str) -> None:
     """Print the constants a species carries."""
