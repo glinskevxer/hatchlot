@@ -2,6 +2,7 @@
 
 from . import (  # noqa: F401  (registering the command groups)
     calc,
+    doctor,
     feeding,
     health,
     importing,
