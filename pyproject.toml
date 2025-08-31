@@ -9,6 +9,16 @@ description = "Production accounting for a coldwater salmonid hatchery"
 readme = "README.md"
 requires-python = ">=3.12"
 authors = [{ name = "glinskevxer" }]
+keywords = ["hatchery", "aquaculture", "salmonid", "fisheries"]
+classifiers = [
+  "Development Status :: 4 - Beta",
+  "Environment :: Console",
+  "Intended Audience :: Science/Research",
+  "Operating System :: OS Independent",
+  "Programming Language :: Python :: 3.12",
+  "Topic :: Scientific/Engineering",
+  "Typing :: Typed",
+]
 dependencies = ["click==8.1.8"]
 
 [project.optional-dependencies]
@@ -25,6 +35,9 @@ hatchlot = "hatchlot.cli.main:main"
 
 [tool.hatch.build.targets.wheel]
 packages = ["src/hatchlot"]
+
+[tool.hatch.build.targets.sdist]
+include = ["src", "tests", "README.md", "pyproject.toml"]
 
 [tool.ruff]
 line-length = 100

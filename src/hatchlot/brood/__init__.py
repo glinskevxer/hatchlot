@@ -17,7 +17,6 @@ from .shed import DayPlan, plan_day, ripe_females
 from .take import SpawnTake, TakeRegister, TakeState
 
 __all__ = [
-    "DEFAULT_MODEL",
     "Assay",
     "AssayLevel",
     "BroodFemale",
@@ -26,6 +25,7 @@ __all__ = [
     "CrossDesign",
     "CrossPlan",
     "CullReason",
+    "DEFAULT_MODEL",
     "DayPlan",
     "Disposition",
     "EggEstimate",
