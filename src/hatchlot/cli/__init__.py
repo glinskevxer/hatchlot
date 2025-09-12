@@ -7,6 +7,7 @@ from . import (  # noqa: F401  (registering the command groups)
     health,
     importing,
     lots,
+    plan,
     report,
     station,
     water,
