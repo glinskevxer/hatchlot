@@ -6,6 +6,7 @@ from . import (  # noqa: F401  (registering the command groups)
     feeding,
     health,
     importing,
+    incubation,
     lots,
     plan,
     report,
