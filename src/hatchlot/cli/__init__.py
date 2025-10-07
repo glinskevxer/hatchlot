@@ -9,6 +9,7 @@ from . import (  # noqa: F401  (registering the command groups)
     importing,
     incubation,
     lots,
+    mark,
     plan,
     report,
     station,
