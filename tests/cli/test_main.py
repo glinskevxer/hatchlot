@@ -109,3 +109,39 @@ def test_an_unknown_command_is_a_usage_error():
 
 def test_the_group_is_a_click_group():
     assert isinstance(main, click.Group)
+
+
+def test_the_guarded_decorator_turns_a_refusal_into_an_exit_code():
+    from hatchlot.cli.main import guarded
+
+    @main.command("guarded-boom")
+    @guarded
+    def boom() -> None:
+        raise PolicyError("no room", rule="loading.density")
+
+    result = run("guarded-boom")
+    assert result.exit_code == EXIT_REFUSED
+    assert "loading.density" in result.output
+    main.commands.pop("guarded-boom")
+
+
+def test_the_guarded_decorator_lets_a_bug_through():
+    from hatchlot.cli.main import guarded
+
+    @guarded
+    def broken() -> None:
+        raise RuntimeError("that was not meant to happen")
+
+    with pytest.raises(RuntimeError):
+        broken()
+
+
+def test_the_guarded_decorator_keeps_the_command_name_and_help():
+    from hatchlot.cli.main import guarded
+
+    @guarded
+    def named() -> None:
+        """What this command does."""
+
+    assert named.__name__ == "named"
+    assert named.__doc__ == "What this command does."

@@ -12,10 +12,11 @@ may be able to argue with and a validation error is not.
 
 from __future__ import annotations
 
+import functools
 import sys
 from collections.abc import Callable
 from dataclasses import dataclass
-from typing import Any
+from typing import Any, TypeVar, cast
 
 import click
 
@@ -24,6 +25,8 @@ from ..errors import HatchlotError, NotFoundError, PolicyError, ValidationError
 
 EXIT_OK = 0
 EXIT_REFUSED = 2
+
+F = TypeVar("F", bound=Callable[..., Any])
 
 
 @dataclass
@@ -71,6 +74,25 @@ def guard(action: Callable[[], Any]) -> None:
     code = run_guarded(action)
     if code != EXIT_OK:
         raise SystemExit(code)
+
+
+def guarded(command: F) -> F:
+    """Wrap a command body so a deliberate error becomes an exit code.
+
+    Every command was doing this by hand, with an inner function and a call to
+    `guard`, which is four lines of ceremony per command and one more place for
+    a command to forget.
+    """
+
+    @functools.wraps(command)
+    def wrapper(*args: Any, **kwargs: Any) -> None:
+        try:
+            command(*args, **kwargs)
+        except HatchlotError as error:
+            click.echo(describe_error(error), err=True)
+            raise SystemExit(EXIT_REFUSED) from None
+
+    return cast("F", wrapper)
 
 
 @click.group(context_settings={"help_option_names": ["-h", "--help"]})

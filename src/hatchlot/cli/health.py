@@ -24,7 +24,7 @@ from ..health.treatment import (
 )
 from ..quantities.base import Quantity
 from ..quantities.temperature import Temperature
-from .main import Context, guard, main, pass_context
+from .main import Context, guarded, main, pass_context
 from .options import format_option
 from .output import echo, echo_pairs, parse_format
 
@@ -55,6 +55,7 @@ def health() -> None:
 @click.option("--floor", default="6.0", show_default=True, help="Oxygen floor in mg/L.")
 @format_option
 @pass_context
+@guarded
 def treatment(
     context: Context,
     chemical: str,
@@ -70,60 +71,55 @@ def treatment(
 ) -> None:
     """Work out a treatment and check it before it goes in the water."""
 
-    def run() -> None:
-        planned = Treatment(
-            lot="",
-            chemical=Chemical(chemical),
-            method=Method(method),
-            concentration_ppm=Decimal(concentration),
-            minutes=Decimal(minutes),
-            water=Temperature(water, "C"),
-            volume=Quantity(volume, "m3") if volume else None,
-            flow=Quantity(flow, "gpm") if flow else None,
-        )
-        planned.check()
-        if inflow:
-            check_oxygen(planned, inflow, floor)
-        echo_pairs(
-            [
-                ("chemical", planned.chemical.value),
-                ("method", planned.method.value),
-                ("ceiling ppm", safe_ceiling(planned.chemical, planned.water)),
-                ("exposure", planned.exposure),
-                ("dose", planned.dose.rounded(context.places)),
-                ("oxygen cost mgL", oxygen_headroom_needed(planned)),
-            ],
-            parse_format(form),
-            places=context.places,
-        )
-
-    guard(run)
+    planned = Treatment(
+        lot="",
+        chemical=Chemical(chemical),
+        method=Method(method),
+        concentration_ppm=Decimal(concentration),
+        minutes=Decimal(minutes),
+        water=Temperature(water, "C"),
+        volume=Quantity(volume, "m3") if volume else None,
+        flow=Quantity(flow, "gpm") if flow else None,
+    )
+    planned.check()
+    if inflow:
+        check_oxygen(planned, inflow, floor)
+    echo_pairs(
+        [
+            ("chemical", planned.chemical.value),
+            ("method", planned.method.value),
+            ("ceiling ppm", safe_ceiling(planned.chemical, planned.water)),
+            ("exposure", planned.exposure),
+            ("dose", planned.dose.rounded(context.places)),
+            ("oxygen cost mgL", oxygen_headroom_needed(planned)),
+        ],
+        parse_format(form),
+        places=context.places,
+    )
 
 
 @health.command("ceiling")
 @click.option("--water", required=True, help="Water temperature in C.")
 @format_option
 @pass_context
+@guarded
 def ceiling(context: Context, water: str, form: str) -> None:
     """List what every chemical may be run at on this water."""
 
-    def run() -> None:
-        temperature = Temperature(water, "C")
-        echo(
-            ["chemical", "ceiling ppm", "takes oxygen"],
+    temperature = Temperature(water, "C")
+    echo(
+        ["chemical", "ceiling ppm", "takes oxygen"],
+        [
             [
-                [
-                    entry.value,
-                    safe_ceiling(entry, temperature),
-                    entry.consumes_oxygen,
-                ]
-                for entry in Chemical
-            ],
-            parse_format(form),
-            places=context.places,
-        )
-
-    guard(run)
+                entry.value,
+                safe_ceiling(entry, temperature),
+                entry.consumes_oxygen,
+            ]
+            for entry in Chemical
+        ],
+        parse_format(form),
+        places=context.places,
+    )
 
 
 @health.command("prescription")
@@ -136,6 +132,7 @@ def ceiling(context: Context, water: str, form: str) -> None:
 @click.option("--feeding-rate", "rate", required=True, help="Percent of body weight a day.")
 @format_option
 @pass_context
+@guarded
 def prescription(
     context: Context,
     lot_code: str,
@@ -149,34 +146,31 @@ def prescription(
 ) -> None:
     """Turn a prescription into an inclusion rate and a feed order."""
 
-    def run() -> None:
-        compound = Drug(drug)
-        order = Prescription(
-            code="RX",
-            lot=lot_code,
-            drug=compound,
-            dose_mg_per_kg=Decimal(dose) if dose else compound.label_dose_mg_per_kg,
-            days=days or compound.label_days,
-            start=parse_date(start),
-            prescribed_by="vet",
-        )
-        weight = Quantity(biomass, "kg")
-        echo_pairs(
-            [
-                ("lot", order.lot),
-                ("drug", order.drug.value),
-                ("dose mg per kg", order.dose_mg_per_kg),
-                ("days", Decimal(order.days)),
-                ("off label", order.is_off_label),
-                ("inclusion mg per kg feed", inclusion_rate(order, rate)),
-                (
-                    "medicated feed",
-                    medicated_feed_needed(order, weight, rate).rounded(context.places),
-                ),
-                ("withdrawal degree days", order.drug.withdrawal_degree_days),
-            ],
-            parse_format(form),
-            places=context.places,
-        )
-
-    guard(run)
+    compound = Drug(drug)
+    order = Prescription(
+        code="RX",
+        lot=lot_code,
+        drug=compound,
+        dose_mg_per_kg=Decimal(dose) if dose else compound.label_dose_mg_per_kg,
+        days=days or compound.label_days,
+        start=parse_date(start),
+        prescribed_by="vet",
+    )
+    weight = Quantity(biomass, "kg")
+    echo_pairs(
+        [
+            ("lot", order.lot),
+            ("drug", order.drug.value),
+            ("dose mg per kg", order.dose_mg_per_kg),
+            ("days", Decimal(order.days)),
+            ("off label", order.is_off_label),
+            ("inclusion mg per kg feed", inclusion_rate(order, rate)),
+            (
+                "medicated feed",
+                medicated_feed_needed(order, weight, rate).rounded(context.places),
+            ),
+            ("withdrawal degree days", order.drug.withdrawal_degree_days),
+        ],
+        parse_format(form),
+        places=context.places,
+    )

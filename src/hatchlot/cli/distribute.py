@@ -26,7 +26,7 @@ from ..distribution.request import StockingRequest
 from ..errors import ValidationError
 from ..quantities.base import Quantity
 from ..quantities.temperature import Temperature
-from .main import Context, guard, main, pass_context
+from .main import Context, guarded, main, pass_context
 from .options import format_option
 from .output import count_line, echo, echo_pairs, parse_format
 
@@ -88,6 +88,7 @@ def distribute() -> None:
 )
 @format_option
 @pass_context
+@guarded
 def allocate_command(
     context: Context,
     requests: tuple[str, ...],
@@ -99,24 +100,21 @@ def allocate_command(
 ) -> None:
     """Divide the fish that exist among the waters that asked for them."""
 
-    def run() -> None:
-        window = DateRange(start, end)
-        plan = allocate(
-            _requests(requests, window),
-            _offers(offers, window.start),
-            AllocationPolicy(policy),
-        )
-        echo(
-            ["request", "lot", "fish", "size gap"],
-            [[entry.request, entry.lot, entry.fish, entry.size_gap] for entry in plan.assignments],
-            parse_format(form),
-            places=context.places,
-        )
-        context.say(plan.line())
-        if plan.unfilled:
-            context.say(f"unfilled: {', '.join(plan.unfilled)}")
-
-    guard(run)
+    window = DateRange(start, end)
+    plan = allocate(
+        _requests(requests, window),
+        _offers(offers, window.start),
+        AllocationPolicy(policy),
+    )
+    echo(
+        ["request", "lot", "fish", "size gap"],
+        [[entry.request, entry.lot, entry.fish, entry.size_gap] for entry in plan.assignments],
+        parse_format(form),
+        places=context.places,
+    )
+    context.say(plan.line())
+    if plan.unfilled:
+        context.say(f"unfilled: {', '.join(plan.unfilled)}")
 
 
 @distribute.command("haul")
@@ -128,6 +126,7 @@ def allocate_command(
 @click.option("--receiving", default="", help="Receiving water temperature in C.")
 @format_option
 @pass_context
+@guarded
 def haul_command(
     context: Context,
     fish: str,
@@ -140,56 +139,51 @@ def haul_command(
 ) -> None:
     """Size a haul, and say how long the tempering will take."""
 
-    def run() -> None:
-        truck_water = Temperature(water, "C")
-        one_tank = Tank(code="TK-1", volume=Quantity(tank, "L"), supply=OxygenSupply.BOTTLED)
-        trips = loads_needed(fish, Quantity(weight, "g"), one_tank, hours, truck_water)
-        load = HaulLoad(
-            code="HL-1",
-            tanks=[one_tank],
-            fish=Decimal(fish) / Decimal(trips),
-            mean_weight=Quantity(weight, "g"),
-            hours=Decimal(hours),
-            load_water=truck_water,
-            driver="command line",
-        )
-        pairs: list[tuple[str, object]] = [
-            ("fish", Decimal(fish)),
-            ("density kg per L", haul_density(hours, truck_water)),
-            ("tank capacity", load.capacity.rounded(context.places)),
-            ("loads", Decimal(trips)),
-            ("fish per load", load.fish.to_integral_value()),
-            ("oxygen per load", load.oxygen().rounded(3)),
-        ]
-        if receiving:
-            into = Temperature(receiving, "C")
-            pairs.append(("receiving", into.rounded(1)))
-            pairs.append(("tempering minutes", Decimal(tempering_minutes(truck_water, into))))
-        echo_pairs(pairs, parse_format(form), places=context.places)
-
-    guard(run)
+    truck_water = Temperature(water, "C")
+    one_tank = Tank(code="TK-1", volume=Quantity(tank, "L"), supply=OxygenSupply.BOTTLED)
+    trips = loads_needed(fish, Quantity(weight, "g"), one_tank, hours, truck_water)
+    load = HaulLoad(
+        code="HL-1",
+        tanks=[one_tank],
+        fish=Decimal(fish) / Decimal(trips),
+        mean_weight=Quantity(weight, "g"),
+        hours=Decimal(hours),
+        load_water=truck_water,
+        driver="command line",
+    )
+    pairs: list[tuple[str, object]] = [
+        ("fish", Decimal(fish)),
+        ("density kg per L", haul_density(hours, truck_water)),
+        ("tank capacity", load.capacity.rounded(context.places)),
+        ("loads", Decimal(trips)),
+        ("fish per load", load.fish.to_integral_value()),
+        ("oxygen per load", load.oxygen().rounded(3)),
+    ]
+    if receiving:
+        into = Temperature(receiving, "C")
+        pairs.append(("receiving", into.rounded(1)))
+        pairs.append(("tempering minutes", Decimal(tempering_minutes(truck_water, into))))
+    echo_pairs(pairs, parse_format(form), places=context.places)
 
 
 @distribute.command("density")
 @click.option("--hours", required=True, help="How long the trip is.")
 @format_option
 @pass_context
+@guarded
 def density(context: Context, hours: str, form: str) -> None:
     """Show how the haul density falls as the water warms."""
 
-    def run() -> None:
-        echo(
-            ["water C", "kg per litre"],
-            [
-                [Decimal(celsius), haul_density(hours, Temperature(celsius, "C"))]
-                for celsius in (4, 8, 12, 16, 20)
-            ],
-            parse_format(form),
-            places=4,
-        )
-        context.say(f"over {hours} hours")
-
-    guard(run)
+    echo(
+        ["water C", "kg per litre"],
+        [
+            [Decimal(celsius), haul_density(hours, Temperature(celsius, "C"))]
+            for celsius in (4, 8, 12, 16, 20)
+        ],
+        parse_format(form),
+        places=4,
+    )
+    context.say(f"over {hours} hours")
 
 
 @distribute.command("requests")
@@ -200,31 +194,29 @@ def density(context: Context, hours: str, form: str) -> None:
 @click.option("--to", "end", required=True, help="Last day of the window.")
 @format_option
 @pass_context
+@guarded
 def requests_command(
     context: Context, requests: tuple[str, ...], start: str, end: str, form: str
 ) -> None:
     """Read a list of requests back with what each one weighs."""
 
-    def run() -> None:
-        window = DateRange(start, end)
-        built = _requests(requests, window)
-        echo(
-            ["code", "water", "species", "fish", "size", "biomass", "priority"],
+    window = DateRange(start, end)
+    built = _requests(requests, window)
+    echo(
+        ["code", "water", "species", "fish", "size", "biomass", "priority"],
+        [
             [
-                [
-                    entry.code,
-                    entry.water,
-                    entry.species,
-                    entry.fish,
-                    entry.target_weight,
-                    entry.biomass(),
-                    Decimal(entry.priority),
-                ]
-                for entry in built
-            ],
-            parse_format(form),
-            places=context.places,
-        )
-        context.say(count_line("request", len(built)))
-
-    guard(run)
+                entry.code,
+                entry.water,
+                entry.species,
+                entry.fish,
+                entry.target_weight,
+                entry.biomass(),
+                Decimal(entry.priority),
+            ]
+            for entry in built
+        ],
+        parse_format(form),
+        places=context.places,
+    )
+    context.say(count_line("request", len(built)))

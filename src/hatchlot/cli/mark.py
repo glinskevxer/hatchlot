@@ -16,7 +16,7 @@ import click
 from ..marking.mark import MarkPlan, MarkType, TagCode, mark_rate
 from ..marking.run import MarkingRun, QualityCheck
 from ..marking.summary import summarise_group, tags_needed
-from .main import Context, guard, main, pass_context
+from .main import Context, guarded, main, pass_context
 from .options import format_option
 from .output import echo, echo_pairs, parse_format
 
@@ -51,6 +51,7 @@ def mark() -> None:
 @click.option("--retention", default="0.95", show_default=True, help="Expected tag retention.")
 @format_option
 @pass_context
+@guarded
 def order(
     context: Context,
     lot_code: str,
@@ -63,24 +64,21 @@ def order(
 ) -> None:
     """Say how many fish to mark and how many tags to order."""
 
-    def run() -> None:
-        plan = _plan(lot_code, marks, tag, rate)
-        to_mark = plan.fish_to_mark(fish)
-        echo_pairs(
-            [
-                ("lot", plan.lot),
-                ("marks", ", ".join(entry.value for entry in plan.marks)),
-                ("tag code", str(plan.tag_code) if plan.tag_code else ""),
-                ("fish", Decimal(fish)),
-                ("to mark", to_mark),
-                ("tags to order", tags_needed(plan, fish, expected_retention=retention)),
-                ("double index", plan.is_visible and plan.needs_a_code),
-            ],
-            parse_format(form),
-            places=context.places,
-        )
-
-    guard(run)
+    plan = _plan(lot_code, marks, tag, rate)
+    to_mark = plan.fish_to_mark(fish)
+    echo_pairs(
+        [
+            ("lot", plan.lot),
+            ("marks", ", ".join(entry.value for entry in plan.marks)),
+            ("tag code", str(plan.tag_code) if plan.tag_code else ""),
+            ("fish", Decimal(fish)),
+            ("to mark", to_mark),
+            ("tags to order", tags_needed(plan, fish, expected_retention=retention)),
+            ("double index", plan.is_visible and plan.needs_a_code),
+        ],
+        parse_format(form),
+        places=context.places,
+    )
 
 
 @mark.command("check")
@@ -93,6 +91,7 @@ def order(
 @click.option("--rate", default="1.0", show_default=True, help="The rate the plan wanted.")
 @format_option
 @pass_context
+@guarded
 def check(
     context: Context,
     lot_code: str,
@@ -106,40 +105,37 @@ def check(
 ) -> None:
     """Accept or reject a run on its quality check."""
 
-    def run() -> None:
-        plan = _plan(lot_code, (MarkType.ADIPOSE_CLIP.value,), "", rate)
-        marking = MarkingRun(
-            code="MR-1",
-            lot=lot_code,
-            day=date(2000, 1, 1),
-            plan=plan,
-            presented=Decimal(presented),
-            crew="command line",
+    plan = _plan(lot_code, (MarkType.ADIPOSE_CLIP.value,), "", rate)
+    marking = MarkingRun(
+        code="MR-1",
+        lot=lot_code,
+        day=date(2000, 1, 1),
+        plan=plan,
+        presented=Decimal(presented),
+        crew="command line",
+    )
+    marking.start()
+    marking.finish(Decimal(marked))
+    marking.check(
+        QualityCheck(
+            day=date(2000, 1, 2),
+            sampled=int(sampled),
+            marked=int(found),
+            tags_detected=int(tags),
         )
-        marking.start()
-        marking.finish(Decimal(marked))
-        marking.check(
-            QualityCheck(
-                day=date(2000, 1, 2),
-                sampled=int(sampled),
-                marked=int(found),
-                tags_detected=int(tags),
-            )
-        )
-        state = marking.accept()
-        echo_pairs(
-            [
-                ("lot", marking.lot),
-                ("applied rate", marking.applied_rate.quantize(Decimal("0.0001"))),
-                ("checked rate", marking.checked_rate().quantize(Decimal("0.0001"))),
-                ("shortfall", marking.shortfall),
-                ("state", state.value),
-            ],
-            parse_format(form),
-            places=context.places,
-        )
-
-    guard(run)
+    )
+    state = marking.accept()
+    echo_pairs(
+        [
+            ("lot", marking.lot),
+            ("applied rate", marking.applied_rate.quantize(Decimal("0.0001"))),
+            ("checked rate", marking.checked_rate().quantize(Decimal("0.0001"))),
+            ("shortfall", marking.shortfall),
+            ("state", state.value),
+        ],
+        parse_format(form),
+        places=context.places,
+    )
 
 
 @mark.command("group")
@@ -153,58 +149,56 @@ def check(
 @click.option("--rate", default="1.0", show_default=True, help="The rate the plan wanted.")
 @format_option
 @pass_context
+@guarded
 def group(context: Context, lot_code: str, runs: tuple[str, ...], rate: str, form: str) -> None:
     """Add several runs up into the numbers on the release report."""
 
-    def run() -> None:
-        plan = _plan(lot_code, (MarkType.ADIPOSE_CLIP.value,), "", rate)
-        built = []
-        for index, raw in enumerate(runs, start=1):
-            parts = raw.split(":")
-            if len(parts) != 6:
-                raise click.ClickException(
-                    f"{raw!r} is not presented:marked:sampled:found:tags:days_after"
-                )
-            marking = MarkingRun(
-                code=f"MR-{index:03d}",
-                lot=lot_code,
-                day=date(2025, 1, 1),
-                plan=plan,
-                presented=Decimal(parts[0]),
-                crew="command line",
+    plan = _plan(lot_code, (MarkType.ADIPOSE_CLIP.value,), "", rate)
+    built = []
+    for index, raw in enumerate(runs, start=1):
+        parts = raw.split(":")
+        if len(parts) != 6:
+            raise click.ClickException(
+                f"{raw!r} is not presented:marked:sampled:found:tags:days_after"
             )
-            marking.start()
-            marking.finish(Decimal(parts[1]))
-            marking.check(
-                QualityCheck(
-                    day=date(2025, 1, 1 + int(parts[5])),
-                    sampled=int(parts[2]),
-                    marked=int(parts[3]),
-                    tags_detected=int(parts[4]),
-                )
-            )
-            marking.accept()
-            built.append(marking)
-        summary = summarise_group(plan, built)
-        echo(
-            ["runs", "accepted", "presented", "marked", "rate", "retention", "effective"],
-            [
-                [
-                    Decimal(summary.runs),
-                    Decimal(summary.accepted_runs),
-                    summary.presented,
-                    summary.marked,
-                    summary.checked_rate,
-                    summary.retention,
-                    summary.effective_rate,
-                ]
-            ],
-            parse_format(form),
-            places=4,
+        marking = MarkingRun(
+            code=f"MR-{index:03d}",
+            lot=lot_code,
+            day=date(2025, 1, 1),
+            plan=plan,
+            presented=Decimal(parts[0]),
+            crew="command line",
         )
-        context.say(summary.line())
-
-    guard(run)
+        marking.start()
+        marking.finish(Decimal(parts[1]))
+        marking.check(
+            QualityCheck(
+                day=date(2025, 1, 1 + int(parts[5])),
+                sampled=int(parts[2]),
+                marked=int(parts[3]),
+                tags_detected=int(parts[4]),
+            )
+        )
+        marking.accept()
+        built.append(marking)
+    summary = summarise_group(plan, built)
+    echo(
+        ["runs", "accepted", "presented", "marked", "rate", "retention", "effective"],
+        [
+            [
+                Decimal(summary.runs),
+                Decimal(summary.accepted_runs),
+                summary.presented,
+                summary.marked,
+                summary.checked_rate,
+                summary.retention,
+                summary.effective_rate,
+            ]
+        ],
+        parse_format(form),
+        places=4,
+    )
+    context.say(summary.line())
 
 
 @mark.command("rate")
@@ -212,18 +206,16 @@ def group(context: Context, lot_code: str, runs: tuple[str, ...], rate: str, for
 @click.option("--population", required=True, help="How many there are.")
 @format_option
 @pass_context
+@guarded
 def rate_command(context: Context, marked: str, population: str, form: str) -> None:
     """Work out a mark rate."""
 
-    def run() -> None:
-        echo_pairs(
-            [
-                ("marked", Decimal(marked)),
-                ("population", Decimal(population)),
-                ("rate", mark_rate(marked, population).quantize(Decimal("0.0001"))),
-            ],
-            parse_format(form),
-            places=context.places,
-        )
-
-    guard(run)
+    echo_pairs(
+        [
+            ("marked", Decimal(marked)),
+            ("population", Decimal(population)),
+            ("rate", mark_rate(marked, population).quantize(Decimal("0.0001"))),
+        ],
+        parse_format(form),
+        places=context.places,
+    )

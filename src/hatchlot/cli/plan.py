@@ -21,7 +21,7 @@ from ..quantities.temperature import Temperature
 from ..store.lots import load_lot
 from ..store.session import open_session
 from ..water.thermal import ThermalSeries
-from .main import Context, guard, main, pass_context
+from .main import Context, guarded, main, pass_context
 from .options import format_option
 from .output import echo, echo_pairs, parse_format
 
@@ -40,6 +40,7 @@ def plan() -> None:
 @click.option("--target", default="", help="A size to check against, in grams.")
 @format_option
 @pass_context
+@guarded
 def size(
     context: Context,
     weight: str,
@@ -52,31 +53,28 @@ def size(
 ) -> None:
     """Say how big a lot will be on a date."""
 
-    def run() -> None:
-        model = GrowthModel(coefficient=Decimal(coefficient))
-        projection = project_to_date(
-            model,
-            Quantity(weight, "g"),
-            start,
-            end,
-            ThermalSeries(),
-            assumed_celsius=water,
-        )
-        pairs: list[tuple[str, object]] = [
-            ("from", projection.start_day.isoformat()),
-            ("to", projection.end_day.isoformat()),
-            ("days", Decimal(projection.days)),
-            ("thermal units", projection.thermal_units),
-            ("start weight", projection.start_weight.rounded(context.places)),
-            ("end weight", projection.end_weight.rounded(context.places)),
-            ("assumed water", projection.assumed_celsius),
-        ]
-        if target:
-            pairs.append(("target", Quantity(target, "g")))
-            pairs.append(("meets target", meets_target(projection, Quantity(target, "g"))))
-        echo_pairs(pairs, parse_format(form), places=context.places)
-
-    guard(run)
+    model = GrowthModel(coefficient=Decimal(coefficient))
+    projection = project_to_date(
+        model,
+        Quantity(weight, "g"),
+        start,
+        end,
+        ThermalSeries(),
+        assumed_celsius=water,
+    )
+    pairs: list[tuple[str, object]] = [
+        ("from", projection.start_day.isoformat()),
+        ("to", projection.end_day.isoformat()),
+        ("days", Decimal(projection.days)),
+        ("thermal units", projection.thermal_units),
+        ("start weight", projection.start_weight.rounded(context.places)),
+        ("end weight", projection.end_weight.rounded(context.places)),
+        ("assumed water", projection.assumed_celsius),
+    ]
+    if target:
+        pairs.append(("target", Quantity(target, "g")))
+        pairs.append(("meets target", meets_target(projection, Quantity(target, "g"))))
+    echo_pairs(pairs, parse_format(form), places=context.places)
 
 
 @plan.command("date")
@@ -87,6 +85,7 @@ def size(
 @click.option("--from", "start", required=True, help="The day to start from.")
 @format_option
 @pass_context
+@guarded
 def date_command(
     context: Context,
     weight: str,
@@ -98,24 +97,19 @@ def date_command(
 ) -> None:
     """Say when a lot reaches a size."""
 
-    def run() -> None:
-        model = GrowthModel(coefficient=Decimal(coefficient))
-        projection = project_to_size(
-            model, Quantity(weight, "g"), Quantity(target, "g"), start, water
-        )
-        echo_pairs(
-            [
-                ("from", projection.start_day.isoformat()),
-                ("reaches", projection.end_day.isoformat()),
-                ("days", Decimal(projection.days)),
-                ("thermal units", projection.thermal_units),
-                ("assumed water", projection.assumed_celsius),
-            ],
-            parse_format(form),
-            places=context.places,
-        )
-
-    guard(run)
+    model = GrowthModel(coefficient=Decimal(coefficient))
+    projection = project_to_size(model, Quantity(weight, "g"), Quantity(target, "g"), start, water)
+    echo_pairs(
+        [
+            ("from", projection.start_day.isoformat()),
+            ("reaches", projection.end_day.isoformat()),
+            ("days", Decimal(projection.days)),
+            ("thermal units", projection.thermal_units),
+            ("assumed water", projection.assumed_celsius),
+        ],
+        parse_format(form),
+        places=context.places,
+    )
 
 
 @plan.command("fit")
@@ -124,23 +118,21 @@ def date_command(
 @click.option("--units", required=True, help="Thermal units between the two.")
 @format_option
 @pass_context
+@guarded
 def fit(context: Context, start_weight: str, end_weight: str, units: str, form: str) -> None:
     """Fit a growth coefficient to what a lot actually did."""
 
-    def run() -> None:
-        model = fit_coefficient(Quantity(start_weight, "g"), Quantity(end_weight, "g"), units)
-        echo_pairs(
-            [
-                ("coefficient", model.coefficient.quantize(Decimal("0.0001"))),
-                ("start", Quantity(start_weight, "g")),
-                ("end", Quantity(end_weight, "g")),
-                ("units", Decimal(units)),
-            ],
-            parse_format(form),
-            places=context.places,
-        )
-
-    guard(run)
+    model = fit_coefficient(Quantity(start_weight, "g"), Quantity(end_weight, "g"), units)
+    echo_pairs(
+        [
+            ("coefficient", model.coefficient.quantize(Decimal("0.0001"))),
+            ("start", Quantity(start_weight, "g")),
+            ("end", Quantity(end_weight, "g")),
+            ("units", Decimal(units)),
+        ],
+        parse_format(form),
+        places=context.places,
+    )
 
 
 @plan.command("lot")
@@ -151,6 +143,7 @@ def fit(context: Context, start_weight: str, end_weight: str, units: str, form: 
 @click.option("--as-of", "as_of", default="", help="The day the current weight is from.")
 @format_option
 @pass_context
+@guarded
 def lot_plan(
     context: Context,
     code: str,
@@ -162,34 +155,31 @@ def lot_plan(
 ) -> None:
     """Project a lot that is already in the database."""
 
-    def run() -> None:
-        with open_session(context.database) as session:
-            record = load_lot(session.connection, code)
-        model = GrowthModel(coefficient=Decimal(coefficient))
-        start = parse_date(as_of) if as_of else record.ponded_on
-        projection = project_to_date(
-            model,
-            record.mean_weight,
-            start,
-            end,
-            ThermalSeries(),
-            assumed_celsius=water,
-        )
-        biomass = Quantity(record.population * projection.end_weight.to("kg").amount, "kg")
-        echo(
-            ["lot", "fish", "now", "then", "biomass then"],
+    with open_session(context.database) as session:
+        record = load_lot(session.connection, code)
+    model = GrowthModel(coefficient=Decimal(coefficient))
+    start = parse_date(as_of) if as_of else record.ponded_on
+    projection = project_to_date(
+        model,
+        record.mean_weight,
+        start,
+        end,
+        ThermalSeries(),
+        assumed_celsius=water,
+    )
+    biomass = Quantity(record.population * projection.end_weight.to("kg").amount, "kg")
+    echo(
+        ["lot", "fish", "now", "then", "biomass then"],
+        [
             [
-                [
-                    str(record.code),
-                    record.population,
-                    record.mean_weight,
-                    projection.end_weight,
-                    biomass,
-                ]
-            ],
-            parse_format(form),
-            places=context.places,
-        )
-        context.say(f"assuming {Temperature(water, 'C').rounded(1)} over {projection.days} days")
-
-    guard(run)
+                str(record.code),
+                record.population,
+                record.mean_weight,
+                projection.end_weight,
+                biomass,
+            ]
+        ],
+        parse_format(form),
+        places=context.places,
+    )
+    context.say(f"assuming {Temperature(water, 'C').rounded(1)} over {projection.days} days")
