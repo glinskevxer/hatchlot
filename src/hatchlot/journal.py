@@ -30,10 +30,17 @@ class Journal(Generic[T]):
         self.day_of = day_of
         self.key_of = key_of
         self._items: list[T] = []
+        # A second index by key, because `for_key` is the hot path: a station
+        # with three hundred lots was walking every entry in the journal once
+        # per lot to build one inventory.
+        self._by_key: dict[str, list[T]] = {}
 
     def record(self, entry: T) -> T:
         self._items.append(entry)
         self._items.sort(key=self._sort_key)
+        bucket = self._by_key.setdefault(self.key_of(entry), [])
+        bucket.append(entry)
+        bucket.sort(key=self._sort_key)
         return entry
 
     def extend(self, entries: Iterable[T]) -> None:
@@ -53,11 +60,10 @@ class Journal(Generic[T]):
         return tuple(self._items)
 
     def keys(self) -> tuple[str, ...]:
-        return tuple(sorted({self.key_of(entry) for entry in self._items}))
+        return tuple(sorted(self._by_key))
 
     def for_key(self, key: str) -> tuple[T, ...]:
-        code = normalise_code(key, field="key")
-        return tuple(entry for entry in self._items if self.key_of(entry) == code)
+        return tuple(self._by_key.get(normalise_code(key, field="key"), ()))
 
     def within(self, window: DateRange) -> tuple[T, ...]:
         return tuple(entry for entry in self._items if _as_date(self.day_of(entry)) in window)
