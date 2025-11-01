@@ -11,6 +11,7 @@ from . import (  # noqa: F401  (registering the command groups)
     incubation,
     lots,
     mark,
+    permit,
     plan,
     report,
     station,
