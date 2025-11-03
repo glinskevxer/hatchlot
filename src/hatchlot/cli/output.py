@@ -114,8 +114,14 @@ def confirm_or_abort(message: str, *, yes: bool) -> None:
 
 
 def count_line(noun: str, number: int) -> str:
-    """`1 lot` or `3 lots`, which is the one place plurals are decided."""
+    """`1 lot` or `3 lots`, which is the one place plurals are decided.
+
+    English only goes so far here and it does not have to go further: the nouns
+    this prints are lot, unit, reading, feeding, family and command.
+    """
 
     if number == 1:
         return f"1 {noun}"
+    if noun.endswith("y") and not noun.endswith(("ay", "ey", "oy", "uy")):
+        return f"{number} {noun[:-1]}ies"
     return f"{number} {noun}s"

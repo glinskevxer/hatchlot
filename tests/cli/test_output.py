@@ -117,6 +117,16 @@ def test_the_plural_of_a_noun():
     assert count_line("lot", 3) == "3 lots"
 
 
+def test_a_noun_ending_in_a_consonant_and_a_y():
+    assert count_line("family", 1) == "1 family"
+    assert count_line("family", 4) == "4 families"
+
+
+def test_a_noun_ending_in_a_vowel_and_a_y_just_takes_an_s():
+    assert count_line("day", 2) == "2 days"
+    assert count_line("survey", 2) == "2 surveys"
+
+
 def test_booleans_and_nothing_print_in_every_form():
     text = render(["a", "b"], [[True, None]], Format.PLAIN)
     assert text == "true\t"
