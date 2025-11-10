@@ -36,6 +36,7 @@ class Context:
     database: str = ":memory:"
     quiet: bool = False
     places: int = 2
+    traceback: bool = False
 
     def say(self, message: str) -> None:
         if not self.quiet:
@@ -46,7 +47,12 @@ pass_context = click.make_pass_decorator(Context, ensure=True)
 
 
 def describe_error(error: HatchlotError) -> str:
-    """The one line a refusal prints."""
+    """The one line a refusal prints.
+
+    A policy error leads with the rule that refused, because that is the thing
+    an operator can go and argue with. Everything else leads with what kind of
+    problem it was, so a script can grep for one.
+    """
 
     if isinstance(error, PolicyError):
         return f"refused by {error.rule}: {error}"
@@ -76,6 +82,21 @@ def guard(action: Callable[[], Any]) -> None:
         raise SystemExit(code)
 
 
+def wants_traceback() -> bool:
+    """Whether the caller asked to see the real error rather than one line.
+
+    Read off the click context rather than passed down, because the decorator
+    wraps commands that never see the context object.
+    """
+
+    context = click.get_current_context(silent=True)
+    while context is not None:
+        if isinstance(context.obj, Context) and context.obj.traceback:
+            return True
+        context = context.parent
+    return False
+
+
 def guarded(command: F) -> F:
     """Wrap a command body so a deliberate error becomes an exit code.
 
@@ -89,6 +110,8 @@ def guarded(command: F) -> F:
         try:
             command(*args, **kwargs)
         except HatchlotError as error:
+            if wants_traceback():
+                raise
             click.echo(describe_error(error), err=True)
             raise SystemExit(EXIT_REFUSED) from None
 
@@ -106,18 +129,24 @@ def guarded(command: F) -> F:
 )
 @click.option("--quiet", "-q", is_flag=True, help="Print only what was asked for.")
 @click.option(
+    "--traceback",
+    "-t",
+    is_flag=True,
+    help="Show the real error instead of one line, for a bug report.",
+)
+@click.option(
     "--places",
     default=2,
     show_default=True,
     help="Decimal places on printed numbers.",
 )
 @click.pass_context
-def main(ctx: click.Context, database: str, quiet: bool, places: int) -> None:
+def main(ctx: click.Context, database: str, quiet: bool, traceback: bool, places: int) -> None:
     """Production records for a coldwater salmonid hatchery."""
 
     if places < 0 or places > 6:
         raise click.BadParameter("places runs from 0 to 6", param_hint="--places")
-    ctx.obj = Context(database=database, quiet=quiet, places=places)
+    ctx.obj = Context(database=database, quiet=quiet, places=places, traceback=traceback)
 
 
 @main.command()

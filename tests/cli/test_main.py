@@ -145,3 +145,44 @@ def test_the_guarded_decorator_keeps_the_command_name_and_help():
 
     assert named.__name__ == "named"
     assert named.__doc__ == "What this command does."
+
+
+def test_the_traceback_flag_lets_the_real_error_through():
+    from hatchlot.cli.main import guarded
+
+    @main.command("traceback-boom")
+    @guarded
+    def boom() -> None:
+        raise PolicyError("no room", rule="loading.density")
+
+    quiet_result = run("traceback-boom")
+    assert quiet_result.exit_code == EXIT_REFUSED
+    loud_result = CliRunner().invoke(main, ["--traceback", "traceback-boom"])
+    assert isinstance(loud_result.exception, PolicyError)
+    main.commands.pop("traceback-boom")
+
+
+def test_the_traceback_flag_is_off_by_default():
+    assert Context().traceback is False
+
+
+def test_the_context_carries_the_traceback_flag_down():
+    from hatchlot.cli.main import pass_context, wants_traceback
+
+    seen = []
+
+    @main.command("traceback-check")
+    @pass_context
+    def check(context: Context) -> None:
+        seen.append((context.traceback, wants_traceback()))
+
+    run("traceback-check")
+    CliRunner().invoke(main, ["--traceback", "traceback-check"])
+    assert seen == [(False, False), (True, True)]
+    main.commands.pop("traceback-check")
+
+
+def test_wants_traceback_is_false_with_no_context_at_all():
+    from hatchlot.cli.main import wants_traceback
+
+    assert wants_traceback() is False
