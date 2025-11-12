@@ -29,7 +29,7 @@ from .species import Species, resolve_species, species
 from .station import StationProfile
 from .units import Dimension, System, convert
 
-__version__ = "0.1.0"
+__version__ = "1.0.0"
 
 __all__ = [
     "ConversionError",
