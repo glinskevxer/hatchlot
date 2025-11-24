@@ -17,6 +17,7 @@ from . import (  # noqa: F401  (registering the command groups)
     report,
     rules,
     station,
+    today,
     water,
 )
 from .main import main
